@@ -1,21 +1,37 @@
 package pod;
 
-public class Servidor {
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.ArrayList;
+import java.util.List;
+
+public class Servidor extends Thread{
 	
-	static String mensagem = "send 1 to 2"; //Ler mensagem vinda do cliente
-	static String[] variavel = mensagem.split(" ");
+	private static String mensagem, split[];
+	private static List<Cliente> usuarios = new ArrayList<Cliente>();
+	private static ServerSocket serverSocket;
 	
-	public static void main(String[] args){
+	public static void main(String[] args) throws IOException{
+		serverSocket = new ServerSocket(5121, 5);
+		Socket socket = serverSocket.accept();
+		
+		DataInputStream dataInput = new DataInputStream(socket.getInputStream());
+		mensagem = dataInput.readUTF();
 		interpretar(mensagem);
+		serverSocket.close();
 	}
 	
 	private static void interpretar(String comando){
-		switch(variavel[0]){
+		split = mensagem.split(" ");
+		
+		switch(split[0]){
 		case "send":
 			send();
 			break;
 		case "list":
-			list();
+			System.out.println(list());
 			break;
 		case "rename":
 			rename(null);
@@ -42,8 +58,10 @@ public class Servidor {
 		}
 	}
 	
-	private static void list(){
-		
+	private static String list(){
+		String retorno = new String();
+		retorno = "Listar os clientes da lista e enviar pra quem requisitou.";
+		return retorno;
 	}
 
 }
