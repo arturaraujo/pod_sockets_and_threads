@@ -18,9 +18,9 @@ public class Servidor extends Thread{
 	public static void main(String[] args) throws IOException{
 		serverSocket = new ServerSocket(5121);
 		usuarios = new HashMap<String, DataOutputStream>();
+		System.out.println("Servidor rodando!");
 		while(true){//espera conexão de alguem
 			Socket socket = serverSocket.accept();
-			System.out.println("Conexão estabelecida!");
 			
 			Thread thread = new Servidor(socket);
 			thread.start();
@@ -37,8 +37,21 @@ public class Servidor extends Thread{
 			DataInputStream dataInput = new DataInputStream(socket.getInputStream());
 			DataOutputStream dataOutput = new DataOutputStream(socket.getOutputStream());
 			
-			dataOutput.writeUTF("Informe seu nome: ");
-			String nome = dataInput.readUTF();
+			String nome = "";
+			while(true){
+				dataOutput.writeUTF("Informe seu nome: > ");
+				nome = dataInput.readUTF();
+				if (nome.equals("")){
+					dataOutput.writeUTF("O nome informado é inválido.");
+					continue;
+				}
+				if (usuarios.get(nome) != null){
+					dataOutput.writeUTF("O nome informado já existe! ");
+					continue;
+				}
+				dataOutput.writeUTF("Você foi cadastrado com sucesso!");
+				break;
+			}
 			
 			usuarios.put(nome, dataOutput);
 			while(true){
@@ -48,7 +61,6 @@ public class Servidor extends Thread{
 				String mensagem = dataInput.readUTF();
 				interpretar(mensagem, nome);
 			}
-			System.out.println("Conexão encerrada.");
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -61,6 +73,7 @@ public class Servidor extends Thread{
 		switch(split[0]){
 		case "send":
 			if(split[1].equals("-all")){
+				mensagem = mensagem.substring(10, mensagem.length());
 				send(mensagem, remetente, true);
 			}
 			break;
@@ -71,28 +84,38 @@ public class Servidor extends Thread{
 			rename(null);
 			break;
 		case "bye":
-			sair();
+			sair(remetente);
 			break;
 		default:
 			System.out.println("O comando informado é invalido.");
 		}
 	}
 	
-	private void sair() throws IOException{
-		socket.close();
+	private void sair(String usuario) throws IOException{
+		usuarios.get(usuario).writeUTF("bye");
+		informaSaida(usuario);
+		this.socket.close();
+		usuarios.remove(usuario);
 	}
 	
 	private void send(String mensagem, String remetente, boolean todos) throws IOException{
 		for(String key : usuarios.keySet()){
 			if(usuarios.get(key) != usuarios.get(remetente))
-				usuarios.get(key).writeUTF(mensagem + "  pra tudiiiin");			
+				usuarios.get(key).writeUTF(remetente + " enviou: " + mensagem);			
+		}
+	}
+	
+	private void informaSaida(String remetente) throws IOException{
+		for(String key : usuarios.keySet()){
+			if(usuarios.get(key) != usuarios.get(remetente))
+				usuarios.get(key).writeUTF(remetente + " saiu do chat.");			
 		}
 	}
 	
 	private void send() throws IOException{
 		for(String key : usuarios.keySet()){
 			if(usuarios.get(key) != this.socket.getOutputStream())
-				usuarios.get(key).writeUTF(mensagem + "  pra tudiiiin");			
+				usuarios.get(key).writeUTF(mensagem);			
 		}
 	}
 	

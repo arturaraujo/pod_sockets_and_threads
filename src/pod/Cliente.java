@@ -23,11 +23,13 @@ public class Cliente extends Thread{
 
 			DataOutputStream dataOutput = new DataOutputStream(serverSocket.getOutputStream());
 			
-			while(serverSocket.isConnected()){
-				String string = keyboard.nextLine();
+			String string = "";
+			while(!string.equals("bye")){
+				string = keyboard.nextLine();
 				dataOutput.writeUTF(string);
+				System.out.print("Mensagem > ");
 			}
-			serverSocket.close();
+			//serverSocket.close();
 		}catch(Exception e){
 			e.printStackTrace();
 		}
@@ -38,9 +40,17 @@ public class Cliente extends Thread{
 		DataInputStream dataInput;
 		try {
 			dataInput = new DataInputStream(serverSocket.getInputStream());
-			while(true){
-				System.out.println(dataInput.readUTF());
-			}
+			String mensagem = "";
+			do{
+				
+				mensagem = dataInput.readUTF();
+				if (mensagem.equals("bye")){
+					System.out.println("Você saiu do chat.");
+					serverSocket.close();
+					break;
+				}
+				System.out.println(mensagem);
+			}while(serverSocket.isConnected());
 		} catch (IOException e1) {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
