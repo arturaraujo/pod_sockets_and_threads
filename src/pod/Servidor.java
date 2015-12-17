@@ -5,21 +5,26 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
 public class Servidor extends Thread{
 	
 	private static String mensagem, split[];
-	private static Map<String, DataOutputStream> usuarios;
+	private static Map<String, Usuario> usuarios;
 	private static ServerSocket serverSocket;
 	private Socket socket;
 	
 	public static void main(String[] args) throws IOException{
+		
 		serverSocket = new ServerSocket(5121);
-		usuarios = new HashMap<String, DataOutputStream>();
+		usuarios = new HashMap<String, Usuario>();
 		System.out.println("Servidor rodando!");
-		while(true){//espera conexão de alguem
+		
+		while(true){
 			Socket socket = serverSocket.accept();
 			
 			Thread thread = new Servidor(socket);
@@ -34,101 +39,159 @@ public class Servidor extends Thread{
 	@Override
 	public void run() {
 		try {
+			
 			DataInputStream dataInput = new DataInputStream(socket.getInputStream());
 			DataOutputStream dataOutput = new DataOutputStream(socket.getOutputStream());
 			
+			DateFormat df = new SimpleDateFormat(" HH:mm dd/MM/yyyy");
+			String strData = df.format(new Date(System.currentTimeMillis()));
+			
 			String nome = "";
+			
 			while(true){
+				
 				dataOutput.writeUTF("Informe seu nome: > ");
-				nome = dataInput.readUTF();
+				nome = dataInput.readUTF().toUpperCase();
+				
 				if (nome.equals("")){
-					dataOutput.writeUTF("O nome informado é inválido.");
+					dataOutput.writeUTF("\nO nome informado é inválido.\n");
 					continue;
 				}
+				
 				if (usuarios.get(nome) != null){
-					dataOutput.writeUTF("O nome informado já existe! ");
+					dataOutput.writeUTF("\nO nome informado já existe!\n");
 					continue;
 				}
-				dataOutput.writeUTF("Você foi cadastrado com sucesso!");
+				dataOutput.writeUTF("\nVocê foi cadastrado com sucesso!\n");
 				break;
 			}
 			
-			usuarios.put(nome, dataOutput);
+			Usuario user = new Usuario(socket,dataOutput,dataInput);
+			usuarios.put(nome, user);
+			informaEntrada(nome, strData);
+			
 			while(true){
 				if(socket.isClosed())
 					break;
-				//System.out.println("Servidor aguardando mensagem...");
 				String mensagem = dataInput.readUTF();
-				interpretar(mensagem, nome);
+				nome = interpretar(mensagem, nome);
 			}
+			
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 		
 	}
 	
-	private void interpretar(String mensagem, String remetente)throws IOException{
-		split = mensagem.split(" ");
+	private String interpretar(String mensagem, String remetente)throws IOException{
 		
-		switch(split[0]){
-		case "send":
-			if(split[1].equals("-all")){
-				mensagem = mensagem.substring(10, mensagem.length());
-				send(mensagem, remetente, true);
+		DateFormat df = new SimpleDateFormat(" HH:mm dd/MM/yyyy");
+		String strData = df.format(new Date(System.currentTimeMillis()));
+		
+		try{
+			split = mensagem.split(" ");
+			
+			switch(split[0]){
+			
+				case "send":
+					if(split.length < 2) throw new Exception("\nComando Inválido!");
+					String modo = split[1];
+					if(modo.equals("-all")){
+						if(split.length < 3) throw new Exception("\nComando Inválido!");
+						mensagem = mensagem.substring(10, mensagem.length());
+						send(mensagem, remetente, strData);
+					}else if(modo.equals("-user")){
+						if(split.length < 4) throw new Exception("\nComando Inválido!");
+						String usuario = split[2];
+						mensagem = mensagem.substring(12+usuario.length(), mensagem.length());
+						sendTo(mensagem, usuario.toUpperCase(), remetente, strData);
+					}else throw new Exception("\nCommando Inválido!");
+					break;
+				case "list":
+					list(remetente);
+					break;
+				case "rename":
+					if(split.length < 2) throw new Exception("\nComando Inválido!");
+					String novoNome = split[1];
+					rename(remetente, novoNome.toUpperCase(), strData);
+					remetente = novoNome.toUpperCase();
+					break;
+				case "bye":
+					sair(remetente, strData);
+					break;
+				default:
+					throw new Exception("\nComando Inválido!");
 			}
-			break;
-		case "list":
-			System.out.println(list());
-			break;
-		case "rename":
-			rename(null);
-			break;
-		case "bye":
-			sair(remetente);
-			break;
-		default:
-			System.out.println("O comando informado é invalido.");
+		}catch(Exception ex){
+			usuarios.get(remetente).getDataOutput().writeUTF(ex.getMessage() + strData);		
 		}
+		
+		return remetente;
 	}
 	
-	private void sair(String usuario) throws IOException{
-		usuarios.get(usuario).writeUTF("bye");
-		informaSaida(usuario);
+	private void sair(String usuario, String strData) throws IOException{
+		usuarios.get(usuario).getDataOutput().writeUTF("bye"+strData);
+		informaSaida(usuario, strData);
 		this.socket.close();
 		usuarios.remove(usuario);
 	}
 	
-	private void send(String mensagem, String remetente, boolean todos) throws IOException{
+	private void send(String mensagem, String remetente, String strData) throws IOException{
 		for(String key : usuarios.keySet()){
 			if(usuarios.get(key) != usuarios.get(remetente))
-				usuarios.get(key).writeUTF(remetente + " enviou: " + mensagem);			
+				usuarios.get(key).getDataOutput().writeUTF(getChatName(remetente) + ": " + mensagem+strData);			
 		}
 	}
 	
-	private void informaSaida(String remetente) throws IOException{
+	private void informaEntrada(String remetente, String strData) throws IOException{
 		for(String key : usuarios.keySet()){
 			if(usuarios.get(key) != usuarios.get(remetente))
-				usuarios.get(key).writeUTF(remetente + " saiu do chat.");			
+				usuarios.get(key).getDataOutput().writeUTF("\n"+getChatName(remetente) + " entrou no chat."+strData);			
 		}
 	}
 	
-	private void send() throws IOException{
+	private void informaSaida(String remetente, String strData) throws IOException{
 		for(String key : usuarios.keySet()){
-			if(usuarios.get(key) != this.socket.getOutputStream())
-				usuarios.get(key).writeUTF(mensagem);			
+			if(usuarios.get(key) != usuarios.get(remetente))
+				usuarios.get(key).getDataOutput().writeUTF("\n"+getChatName(remetente) + " saiu do chat."+strData);			
 		}
 	}
 	
-	private static void rename(String novoNome){
-		if(novoNome == null){
-			System.out.println("Novo nome informado inválido.");
-		}
+	private void sendTo(String mensagem, String destinatario, String remetente, String strData) throws Exception{
+		if(usuarios.get(destinatario) == null) throw new Exception("\nUsuário inexistente!");
+			
+		if(!remetente.equals(destinatario))
+			usuarios.get(destinatario).getDataOutput().writeUTF("\n"+getChatName(remetente) + " (direct): " + mensagem+strData);
+		else throw new Exception("\nUsuário inexistente!");
 	}
 	
-	private static String list(){
-		String retorno = new String();
-		retorno = "Listar os clientes da lista e enviar pra quem requisitou.";
-		return retorno;
+	private static void rename(String user, String novoNome, String strData) throws Exception{
+		if(usuarios.get(novoNome) != null) throw new Exception("\nUsuário já existente!");
+		
+		Usuario usuario = usuarios.get(user);
+		usuarios.remove(user);
+		usuarios.put(novoNome, usuario);
+		
+		usuarios.get(novoNome).getDataOutput().writeUTF("\nNome alterado com sucesso!"+strData);
+	}
+	
+	private static void list(String remetente) throws IOException{
+		StringBuilder str = new StringBuilder();
+		str.append("Usuários online:\n");
+		for(String key : usuarios.keySet()){
+			str.append(key + "\n");
+		}
+		usuarios.get(remetente).getDataOutput().writeUTF(str.toString());
+	}
+	
+	private static String getChatName(String user){
+		Usuario usuario = usuarios.get(user);
+		StringBuilder str = new StringBuilder();
+		str.append(usuario.getSocket().getRemoteSocketAddress());
+		str.append("/~");
+		str.append(user);
+		
+		return str.toString().substring(1, str.toString().length());
 	}
 
 }
