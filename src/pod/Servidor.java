@@ -13,7 +13,7 @@ import java.util.Map;
 
 public class Servidor extends Thread{
 	
-	private static String mensagem, split[];
+	private static String split[];
 	private static Map<String, Usuario> usuarios;
 	private static ServerSocket serverSocket;
 	private Socket socket;
