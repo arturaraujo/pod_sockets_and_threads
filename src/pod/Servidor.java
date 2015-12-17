@@ -130,7 +130,7 @@ public class Servidor extends Thread{
 	}
 	
 	private void sair(String usuario, String strData) throws IOException{
-		usuarios.get(usuario).getDataOutput().writeUTF("bye"+strData);
+		usuarios.get(usuario).getDataOutput().writeUTF("bye");
 		informaSaida(usuario, strData);
 		this.socket.close();
 		usuarios.remove(usuario);
